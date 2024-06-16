@@ -174,14 +174,14 @@ class MainScene extends Phaser.Scene {
                         if (this.tiles[rowAbove][col]) {
                             this.tiles[emptyRow][col] = this.tiles[rowAbove][col];
                             this.tiles[emptyRow][col].setData('row', emptyRow);
-                            this.tiles[emptyRow][col].setPosition(col * tileSize, emptyRow * tileSize);
+                            this.animateTileFall(this.tiles[emptyRow][col], emptyRow * tileSize);
                             this.tiles[rowAbove][col] = null;
                             emptyRow--;
                         }
                     }
                     for (let newRow = emptyRow; newRow >= 0; newRow--) {
                         const type = Phaser.Math.Between(0, numTypes - 1);
-                        const tile = this.add.sprite(col * tileSize, newRow * tileSize, 'tiles', type).setOrigin(0);
+                        const tile = this.add.sprite(col * tileSize, newRow * tileSize - tileSize * (emptyRow - newRow + 1), 'tiles', type).setOrigin(0);
                         tile.setData('type', type);
                         tile.setData('row', newRow);
                         tile.setData('col', col);
@@ -189,6 +189,7 @@ class MainScene extends Phaser.Scene {
                         tile.on('pointerdown', () => this.selectTile(tile));
                         this.tiles[newRow][col] = tile;
                         this.gameContainer.add(tile);  // Add new tile to the container
+                        this.animateTileFall(tile, newRow * tileSize);
                     }
                 }
             }
@@ -198,6 +199,16 @@ class MainScene extends Phaser.Scene {
             this.checkMatches();
         });
     }
+
+    animateTileFall(tile, targetY) {
+        this.tweens.add({
+            targets: tile,
+            y: targetY,
+            duration: 300,
+            ease: 'Bounce'
+        });
+    }
+
 }
 
 export default function StartGame(containerId) {
