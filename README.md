@@ -1,3 +1,7 @@
+# Demo
+
+https://princemagbanua.github.io/tile-matching/
+
 # Phaser Vue Template
 
 This is a Phaser 3 project template that uses the Vue framework and Vite for bundling. It includes a bridge for Vue to Phaser game communication, hot-reloading for quick development workflow and scripts to generate production-ready builds.
@@ -11,8 +15,6 @@ This template has been updated for:
 - [Phaser 3.80.1](https://github.com/phaserjs/phaser)
 - [Vue 3.4.27](https://github.com/vuejs)
 - [Vite 5.2.11](https://github.com/vitejs/vite)
-
-![screenshot](screenshot.png)
 
 ## Requirements
 

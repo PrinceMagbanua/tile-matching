@@ -5,75 +5,85 @@ class MainScene extends Phaser.Scene {
 
   preload() {
     this.load.spritesheet('tiles', 'assets/spritesheet.png', { frameWidth: 64, frameHeight: 64 })
+    this.load.image('selectedTile', 'assets/selectedTileFrame.png')
   }
 
   create() {
-    const rows = 8
-    const cols = 8
-    const tileSize = 64
-    const numTypes = 6
-
-    this.tiles = []
-    this.selectedTile = null
-    this.score = 0
-
+    const rows = 8;
+    const cols = 8;
+    const tileSize = 64;
+    const numTypes = 6;
+  
+    this.tiles = [];
+    this.selectedTile = null;
+    this.score = 0;
+  
     // Adjust the position of the score text
     this.scoreText = this.add
       .text(10, 10, 'Score: 0', { fontSize: '32px', fill: '#fff' })
-      .setDepth(1)
-
+      .setDepth(1);
+  
     // Adjust the game container to have a space for the score
-    this.gameContainer = this.add.container(0, 50) // Adding some padding for the score
-
+    this.gameContainer = this.add.container(0, 50); // Adding some padding for the score
+  
     for (let row = 0; row < rows; row++) {
-      this.tiles[row] = []
+      this.tiles[row] = [];
       for (let col = 0; col < cols; col++) {
-        const type = Phaser.Math.Between(0, numTypes - 1)
-        const tile = this.add.sprite(col * tileSize, row * tileSize, 'tiles', type).setOrigin(0)
-        tile.setData('type', type)
-        tile.setData('row', row)
-        tile.setData('col', col)
-        tile.setInteractive()
-        tile.on('pointerdown', () => this.selectTile(tile))
-        this.input.setDraggable(tile)
-        this.tiles[row][col] = tile
-        this.gameContainer.add(tile) // Add tile to the container
+        const type = Phaser.Math.Between(0, numTypes - 1);
+        const tile = this.add.sprite(col * tileSize, row * tileSize, 'tiles', type).setOrigin(0);
+        tile.setData('type', type);
+        tile.setData('row', row);
+        tile.setData('col', col);
+        tile.setInteractive();
+        this.input.setDraggable(tile);
+        this.tiles[row][col] = tile;
+        this.gameContainer.add(tile); // Add tile to the container
       }
     }
-
-    this.countdownAnimation(()=>{
-        this.checkMatches();
-    })
-
+    
+   // Create the selected tile indicator, initially hidden
+   this.selectedTileIndicator = this.add.image(0, 0, 'selectedTile').setOrigin(0).setVisible(false);
+   this.gameContainer.add(this.selectedTileIndicator);
+  
+    this.countdownAnimation(() => {
+      this.checkMatches();
+    });
+  
     this.input.on('dragstart', (pointer, tile) => {
-      this.selectedTile = tile
-    })
-
+      tile.startX = tile.x; // Store initial position
+      tile.startY = tile.y; // Store initial position
+      this.selectedTileIndicator.setPosition(tile.x, tile.y).setVisible(true);
+    });
+  
     this.input.on('dragend', (pointer, tile) => {
-      const dragThreshold = 32
-      const deltaX = pointer.upX - pointer.downX
-      const deltaY = pointer.upY - pointer.downY
-
-      if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        // Horizontal drag
-        if (deltaX > dragThreshold) {
-          this.handleSwipe(tile, 'right')
-        } else if (deltaX < -dragThreshold) {
-          this.handleSwipe(tile, 'left')
+      this.selectedTileIndicator.setVisible(false);
+      const dragThreshold = 32;
+      const deltaX = pointer.upX - pointer.downX;
+      const deltaY = pointer.upY - pointer.downY;
+  
+      if (Math.abs(deltaX) > dragThreshold || Math.abs(deltaY) > dragThreshold) {
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          // Horizontal drag
+          if (deltaX > dragThreshold) {
+            this.handleSwipe(tile, 'right');
+          } else if (deltaX < -dragThreshold) {
+            this.handleSwipe(tile, 'left');
+          }
+        } else {
+          // Vertical drag
+          if (deltaY > dragThreshold) {
+            this.handleSwipe(tile, 'down');
+          } else if (deltaY < -dragThreshold) {
+            this.handleSwipe(tile, 'up');
+          }
         }
       } else {
-        // Vertical drag
-        if (deltaY > dragThreshold) {
-          this.handleSwipe(tile, 'down')
-        } else if (deltaY < -dragThreshold) {
-          this.handleSwipe(tile, 'up')
-        }
+        // If not dragged enough, treat as a click
+        this.selectTile(tile);
       }
-
-      this.selectedTile = null
-    })
-  }
   
+    });
+  }
 
   countdownAnimation(callback) {
      // Countdown text
@@ -111,22 +121,25 @@ class MainScene extends Phaser.Scene {
     animateCountdown()
   }
 
-
   selectTile(tile) {
     if (this.selectedTile) {
       if (this.selectedTile === tile) {
-        this.selectedTile = null // Deselect the tile if the same tile is clicked again
-        return
+        this.selectedTile = null; // Deselect the tile if the same tile is clicked again
+        this.selectedTileIndicator.setVisible(false); // Hide the indicator
+        return;
       }
       if (this.areAdjacent(this.selectedTile, tile)) {
-        this.swapTiles(this.selectedTile, tile)
+        this.swapTiles(this.selectedTile, tile);
       }
-      this.selectedTile = null
+      this.selectedTile = null;
+      this.selectedTileIndicator.setVisible(false); // Hide the indicator after swapping
     } else {
-      this.selectedTile = tile
+      this.selectedTile = tile;
+      // Position and show the indicator
+      this.selectedTileIndicator.setPosition(tile.x, tile.y).setVisible(true);
     }
   }
-
+  
   // Checks if two tiles are adjacent to each other
   areAdjacent(tile1, tile2) {
     const row1 = tile1.getData('row')
@@ -312,7 +325,6 @@ class MainScene extends Phaser.Scene {
           .setOrigin(0)
 
         tile.setData({ type, row: newRow, col }).setInteractive()
-        tile.on('pointerdown', () => this.selectTile(tile))
         this.input.setDraggable(tile)
         this.tiles[newRow][col] = tile
         this.gameContainer.add(tile)
