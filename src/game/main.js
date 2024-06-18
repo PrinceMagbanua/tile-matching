@@ -4,94 +4,101 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.spritesheet('tiles', 'assets/spritesheet.png', { frameWidth: 64, frameHeight: 64 })
+    this.load.spritesheet('tiles', 'assets/spritesheet-1.png', { frameWidth: 64, frameHeight: 64 })
     this.load.image('selectedTile', 'assets/selectedTileFrame.png')
+
+    this.load.audio('pop1', 'assets/sfx/pop1.wav')
+    this.load.audio('pop2', 'assets/sfx/pop2.wav')
+    this.load.audio('pop3', 'assets/sfx/pop3.wav')
+    this.load.audio('pop4', 'assets/sfx/pop4.wav')
   }
 
   create() {
-    const rows = 8;
-    const cols = 8;
-    const tileSize = 64;
-    const numTypes = 6;
-  
-    this.tiles = [];
-    this.selectedTile = null;
-    this.score = 0;
-  
+    const rows = 8
+    const cols = 8
+    const tileSize = 64
+    const numTypes = 6
+
+    this.isMatching = false
+    this.tiles = []
+    this.selectedTile = null
+    this.score = 0
     // Adjust the position of the score text
     this.scoreText = this.add
       .text(10, 10, 'Score: 0', { fontSize: '32px', fill: '#fff' })
-      .setDepth(1);
-  
+      .setDepth(1)
+
     // Adjust the game container to have a space for the score
-    this.gameContainer = this.add.container(0, 50); // Adding some padding for the score
-  
+    this.gameContainer = this.add.container(0, 50) // Adding some padding for the score
+
     for (let row = 0; row < rows; row++) {
-      this.tiles[row] = [];
+      this.tiles[row] = []
       for (let col = 0; col < cols; col++) {
-        const type = Phaser.Math.Between(0, numTypes - 1);
-        const tile = this.add.sprite(col * tileSize, row * tileSize, 'tiles', type).setOrigin(0);
-        tile.setData('type', type);
-        tile.setData('row', row);
-        tile.setData('col', col);
-        tile.setInteractive();
-        this.input.setDraggable(tile);
-        this.tiles[row][col] = tile;
-        this.gameContainer.add(tile); // Add tile to the container
+        const type = Phaser.Math.Between(0, numTypes - 1)
+        const tile = this.add.sprite(col * tileSize, row * tileSize, 'tiles', type).setOrigin(0)
+        tile.setData('type', type)
+        tile.setData('row', row)
+        tile.setData('col', col)
+        tile.setInteractive()
+        this.input.setDraggable(tile)
+        this.tiles[row][col] = tile
+        this.gameContainer.add(tile) // Add tile to the container
       }
     }
-    
-   // Create the selected tile indicator, initially hidden
-   this.selectedTileIndicator = this.add.image(0, 0, 'selectedTile').setOrigin(0).setVisible(false);
-   this.gameContainer.add(this.selectedTileIndicator);
-  
+
+    // Create the selected tile indicator, initially hidden
+    this.selectedTileIndicator = this.add.image(0, 0, 'selectedTile').setOrigin(0).setVisible(false)
+    this.gameContainer.add(this.selectedTileIndicator)
+
     this.countdownAnimation(() => {
-      this.checkMatches();
-    });
-  
+      this.checkMatches()
+    })
+
     this.input.on('dragstart', (pointer, tile) => {
-      tile.startX = tile.x; // Store initial position
-      tile.startY = tile.y; // Store initial position
-      this.selectedTileIndicator.setPosition(tile.x, tile.y).setVisible(true);
-    });
-  
+      tile.startX = tile.x // Store initial position
+      tile.startY = tile.y // Store initial position
+      this.selectedTileIndicator.setPosition(tile.x, tile.y).setVisible(true)
+    })
+
     this.input.on('dragend', (pointer, tile) => {
-      this.selectedTileIndicator.setVisible(false);
-      const dragThreshold = 32;
-      const deltaX = pointer.upX - pointer.downX;
-      const deltaY = pointer.upY - pointer.downY;
-  
+      this.selectedTileIndicator.setVisible(false)
+      const dragThreshold = 32
+      const deltaX = pointer.upX - pointer.downX
+      const deltaY = pointer.upY - pointer.downY
+
       if (Math.abs(deltaX) > dragThreshold || Math.abs(deltaY) > dragThreshold) {
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
           // Horizontal drag
           if (deltaX > dragThreshold) {
-            this.handleSwipe(tile, 'right');
+            this.handleSwipe(tile, 'right')
           } else if (deltaX < -dragThreshold) {
-            this.handleSwipe(tile, 'left');
+            this.handleSwipe(tile, 'left')
           }
         } else {
           // Vertical drag
           if (deltaY > dragThreshold) {
-            this.handleSwipe(tile, 'down');
+            this.handleSwipe(tile, 'down')
           } else if (deltaY < -dragThreshold) {
-            this.handleSwipe(tile, 'up');
+            this.handleSwipe(tile, 'up')
           }
         }
       } else {
         // If not dragged enough, treat as a click
-        this.selectTile(tile);
+        this.selectTile(tile)
       }
-  
-    });
+    })
   }
 
   countdownAnimation(callback) {
-     // Countdown text
-     const countdownText = this.add.text(this.sys.game.config.width / 2, this.sys.game.config.height / 2, 'Ready!', {
+    // Countdown text
+    const countdownText = this.add
+      .text(this.sys.game.config.width / 2, this.sys.game.config.height / 2, 'Ready!', {
         fontSize: '64px',
         fill: '#fff',
         align: 'center'
-    }).setOrigin(0.5).setDepth(1);
+      })
+      .setOrigin(0.5)
+      .setDepth(1)
 
     // Countdown animation
     const countdownPhases = ['Ready!', 'Game', 'Start!']
@@ -122,24 +129,29 @@ class MainScene extends Phaser.Scene {
   }
 
   selectTile(tile) {
+
     if (this.selectedTile) {
       if (this.selectedTile === tile) {
-        this.selectedTile = null; // Deselect the tile if the same tile is clicked again
-        this.selectedTileIndicator.setVisible(false); // Hide the indicator
-        return;
+        this.selectedTile = null // Deselect the tile if the same tile is clicked again
+        this.selectedTileIndicator.setVisible(false) // Hide the indicator
+        return
       }
       if (this.areAdjacent(this.selectedTile, tile)) {
-        this.swapTiles(this.selectedTile, tile);
+        this.swapTiles(this.selectedTile, tile)
+      } else {
+        this.shakeTile(this.selectedTile)
+        this.shakeTile(tile)
+        //TODO: Play SFX here (erroneous tile swap)
       }
-      this.selectedTile = null;
-      this.selectedTileIndicator.setVisible(false); // Hide the indicator after swapping
+      this.selectedTile = null
+      this.selectedTileIndicator.setVisible(false) // Hide the indicator after swapping
     } else {
-      this.selectedTile = tile;
+      this.selectedTile = tile
       // Position and show the indicator
-      this.selectedTileIndicator.setPosition(tile.x, tile.y).setVisible(true);
+      this.selectedTileIndicator.setPosition(tile.x, tile.y).setVisible(true)
     }
   }
-  
+
   // Checks if two tiles are adjacent to each other
   areAdjacent(tile1, tile2) {
     const row1 = tile1.getData('row')
@@ -179,7 +191,7 @@ class MainScene extends Phaser.Scene {
       y: function (target) {
         return target === tile1 ? row2 * 64 : row1 * 64
       },
-      duration: 200,
+      duration: 100,
       onComplete: () => {
         if (!revert) this.checkMatches(tile1, tile2)
       }
@@ -285,15 +297,36 @@ class MainScene extends Phaser.Scene {
     this.score += matches.length
     this.scoreText.setText('Score: ' + this.score)
 
-    matches.forEach((tile) => {
+    // Array of pop sound keys
+    const popSounds = ['pop1', 'pop2', 'pop3', 'pop4'] // Add more sound keys as needed
+
+    matches.forEach((tile, index) => {
       const row = tile.getData('row')
       const col = tile.getData('col')
-      this.tiles[row][col] = null
-      tile.destroy()
-    })
-    this.fillEmptySpaces()
-  }
 
+      // Choose a random pop sound from the array
+      const randomPopSound = Phaser.Math.RND.pick(popSounds)
+
+      // Calculate delay based on index (adjust the delay value as needed)
+      const delay = index * 40 // 300ms delay between each sound (adjust as desired)
+
+      // Play the chosen pop sound with delay
+      this.time.delayedCall(delay, () => {
+        this.sound.play(randomPopSound)
+      })
+
+      // Remove tile from the array and destroy the sprite after the delay
+      this.time.delayedCall(delay, () => {
+        this.tiles[row][col] = null
+        tile.destroy()
+      })
+    })
+
+    // Fill empty spaces after all matches are processed
+    this.time.delayedCall(matches.length * 50, () => {
+      this.fillEmptySpaces()
+    })
+  }
   fillEmptySpaces() {
     const rows = this.tiles.length
     const cols = this.tiles[0].length
@@ -332,14 +365,29 @@ class MainScene extends Phaser.Scene {
       }
     }
 
-    this.time.delayedCall(500, () => this.checkMatches())
+    this.time.delayedCall(300, () => {
+      this.checkMatches()
+    })
   }
 
+  // Method to shake a tile
+  shakeTile(tile) {
+    this.tweens.add({
+      targets: tile,
+      x: tile.x + 5, // Shake distance
+      duration: 50, // Shake duration
+      yoyo: true, // Reverse the animation
+      repeat: 1, // Number of shakes
+      onComplete: () => {
+        tile.x = tile.getData('col') * 64 // Reset tile position
+      }
+    })
+  }
   animateTileFall(tile, targetY) {
     this.tweens.add({
       targets: tile,
       y: targetY,
-      duration: 1000,
+      duration: 300,
       ease: 'Bounce'
     })
   }
