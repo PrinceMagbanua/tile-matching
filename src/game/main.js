@@ -5,6 +5,7 @@ class MainScene extends Phaser.Scene {
 
   preload() {
     this.load.spritesheet('tiles', 'assets/spritesheet-1.png', { frameWidth: 64, frameHeight: 64 })
+    this.load.spritesheet('pop-anim', 'assets/pop-anim.png', { frameWidth: 64, frameHeight: 64 })
     this.load.image('selectedTile', 'assets/selectedTileFrame.png')
 
     this.load.audio('pop1', 'assets/sfx/pop1.wav')
@@ -12,8 +13,18 @@ class MainScene extends Phaser.Scene {
     this.load.audio('pop3', 'assets/sfx/pop3.wav')
     this.load.audio('pop4', 'assets/sfx/pop4.wav')
   }
+  
+  preloadAnimations(){
+    this.anims.create({
+      key: 'bubblePop',
+      frames: this.anims.generateFrameNumbers('pop-anim', { start: 0, end: 4 }), // 5 frames: 0 to 4
+      frameRate: 30,
+      repeat: 0
+    });
+  }
 
   create() {
+    this.preloadAnimations();
     const rows = 8
     const cols = 8
     const tileSize = 64
@@ -23,6 +34,7 @@ class MainScene extends Phaser.Scene {
     this.tiles = []
     this.selectedTile = null
     this.score = 0
+    this.isProcessing = false
     // Adjust the position of the score text
     this.scoreText = this.add
       .text(10, 10, 'Score: 0', { fontSize: '32px', fill: '#fff' })
@@ -49,12 +61,13 @@ class MainScene extends Phaser.Scene {
     // Create the selected tile indicator, initially hidden
     this.selectedTileIndicator = this.add.image(0, 0, 'selectedTile').setOrigin(0).setVisible(false)
     this.gameContainer.add(this.selectedTileIndicator)
-
+    
     this.countdownAnimation(() => {
       this.checkMatches()
     })
 
     this.input.on('dragstart', (pointer, tile) => {
+      if(this.isProcessing) return;
       tile.startX = tile.x // Store initial position
       tile.startY = tile.y // Store initial position
       this.selectedTileIndicator.setPosition(tile.x, tile.y).setVisible(true)
@@ -197,7 +210,9 @@ class MainScene extends Phaser.Scene {
       }
     })
   }
-  checkMatches(movedTile1, movedTile2) {
+
+  async checkMatches(movedTile1, movedTile2) {
+    this.isProcessing = true;
     const rows = this.tiles.length
     const cols = this.tiles[0].length
     const matches = []
@@ -265,42 +280,21 @@ class MainScene extends Phaser.Scene {
     const uniqueMatches = [...new Set(matches)]
 
     if (uniqueMatches.length > 0) {
-      this.removeMatches(uniqueMatches)
+      await this.removeMatches(uniqueMatches)
     } else {
-      if (movedTile2 && movedTile1) {
+      if (movedTile2 && movedTile1) { // swapback
         this.swapTiles(movedTile2, movedTile1, true)
       }
     }
   }
 
-  handleSwipe(tile, direction) {
-    const row = tile.getData('row')
-    const col = tile.getData('col')
-    let targetTile
-
-    if (direction === 'right' && col < this.tiles[0].length - 1) {
-      targetTile = this.tiles[row][col + 1]
-    } else if (direction === 'left' && col > 0) {
-      targetTile = this.tiles[row][col - 1]
-    } else if (direction === 'down' && row < this.tiles.length - 1) {
-      targetTile = this.tiles[row + 1][col]
-    } else if (direction === 'up' && row > 0) {
-      targetTile = this.tiles[row - 1][col]
-    }
-
-    if (targetTile) {
-      this.swapTiles(tile, targetTile)
-    }
-  }
-
-  removeMatches(matches) {
+  async removeMatches(matches) {
     this.score += matches.length
     this.scoreText.setText('Score: ' + this.score)
-
+    var self = this;
     // Array of pop sound keys
     const popSounds = ['pop1', 'pop2', 'pop3', 'pop4'] // Add more sound keys as needed
-
-    matches.forEach((tile, index) => {
+    const destroyMatches = (tile, index) => {
       const row = tile.getData('row')
       const col = tile.getData('col')
 
@@ -315,18 +309,31 @@ class MainScene extends Phaser.Scene {
         this.sound.play(randomPopSound)
       })
 
+      // Trigger the bubble pop animation independently
+      const animSprite = this.add
+        .sprite(tile.x + tile.width / 2, tile.y + tile.height / 2, 'pop-anim')
+        .setScale(1)
+      animSprite.play('bubblePop')
+      animSprite.on('animationcomplete', () => {
+        animSprite.destroy()
+      })
+
+      this.gameContainer.add(animSprite);
+
       // Remove tile from the array and destroy the sprite after the delay
       this.time.delayedCall(delay, () => {
         this.tiles[row][col] = null
         tile.destroy()
       })
-    })
+    }
+    matches.forEach(destroyMatches);
 
     // Fill empty spaces after all matches are processed
     this.time.delayedCall(matches.length * 50, () => {
       this.fillEmptySpaces()
     })
   }
+  
   fillEmptySpaces() {
     const rows = this.tiles.length
     const cols = this.tiles[0].length
@@ -364,10 +371,30 @@ class MainScene extends Phaser.Scene {
         this.animateTileFall(tile, newRow * tileSize)
       }
     }
-
-    this.time.delayedCall(300, () => {
+    this.isProcessing = false;
+    this.time.delayedCall(1000, () => {
       this.checkMatches()
     })
+  }
+
+  handleSwipe(tile, direction) {
+    const row = tile.getData('row')
+    const col = tile.getData('col')
+    let targetTile
+
+    if (direction === 'right' && col < this.tiles[0].length - 1) {
+      targetTile = this.tiles[row][col + 1]
+    } else if (direction === 'left' && col > 0) {
+      targetTile = this.tiles[row][col - 1]
+    } else if (direction === 'down' && row < this.tiles.length - 1) {
+      targetTile = this.tiles[row + 1][col]
+    } else if (direction === 'up' && row > 0) {
+      targetTile = this.tiles[row - 1][col]
+    }
+
+    if (targetTile) {
+      this.swapTiles(tile, targetTile)
+    }
   }
 
   // Method to shake a tile
@@ -388,9 +415,13 @@ class MainScene extends Phaser.Scene {
       targets: tile,
       y: targetY,
       duration: 300,
-      ease: 'Bounce'
-    })
+      ease: 'Bounce',
+      onComplete: () => {
+       
+      }
+    });
   }
+  
 }
 
 export default function StartGame(containerId) {
