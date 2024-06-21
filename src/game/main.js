@@ -30,7 +30,7 @@ class MainScene extends Phaser.Scene {
     const rows = 8
     const cols = 8
     const tileSize = 64
-    const numTypes = 10
+    const numTypes = 6
 
     this.isMatching = false
     this.tiles = []
@@ -302,7 +302,7 @@ class MainScene extends Phaser.Scene {
     const rows = this.tiles.length
     const cols = this.tiles[0].length
     const tileSize = 64
-    const numTypes = 10
+    const numTypes = 6
 
     let promises = [] // Array to store promises for each animation
 
