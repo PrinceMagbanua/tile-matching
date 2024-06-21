@@ -1,168 +1,143 @@
 // gameLogic.js
-import cloneDeep from 'lodash/cloneDeep'
-
-// Function to check for available moves
-function checkForAvailableMoves(_tiles) {
-  const tiles = cloneDeep(_tiles)
-  const rows = tiles.length
-  const cols = tiles[0].length
-  let movesAvailable = false
-
-  // Function to temporarily swap tiles for checking
-  const tempSwapTiles = (tile1, tile2) => {
-    const row1 = tile1.getData('row')
-    const col1 = tile1.getData('col')
-    const row2 = tile2.getData('row')
-    const col2 = tile2.getData('col')
-
-    // Swap tile data temporarily
-    tiles[row1][col1] = tile2
-    tiles[row2][col2] = tile1
-
-    tile1.setData('row', row2)
-    tile1.setData('col', col2)
-    tile2.setData('row', row1)
-    tile2.setData('col', col1)
-  }
-
-  // Function to revert temporary changes
-  const revertTempChanges = (tile1, tile2) => {
-    const row1 = tile1.getData('row')
-    const col1 = tile1.getData('col')
-    const row2 = tile2.getData('row')
-    const col2 = tile2.getData('col')
-
-    // Revert tile data
-    tiles[row1][col1] = tile1
-    tiles[row2][col2] = tile2
-
-    tile1.setData('row', row1)
-    tile1.setData('col', col1)
-    tile2.setData('row', row2)
-    tile2.setData('col', col2)
-  }
-
-  // Function to check for matches without visually updating
-  const checkMatchesWithoutVisualUpdate = (tile1, tile2) => {
-    const row1 = tile1.getData('row')
-    const col1 = tile1.getData('col')
-    const row2 = tile2.getData('row')
-    const col2 = tile2.getData('col')
-
-    // Temporarily swap tiles
-    tempSwapTiles(tile1, tile2)
-
-    // Check for matches
-    const matches = getUniqueMatches(tiles)
-
-    // Revert temporary changes
-    revertTempChanges(tile1, tile2)
-
-    // If matches are found, moves are available
-    if (matches.length > 0) {
-      movesAvailable = true
-    }
-  }
-
-  // Iterate through all tiles and check potential moves
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      // Check right neighbor
-      if (col < cols - 1) {
-        checkMatchesWithoutVisualUpdate(tiles[row][col], tiles[row][col + 1])
-      }
-
-      // Check left neighbor
-      if (col > 0) {
-        checkMatchesWithoutVisualUpdate(tiles[row][col], tiles[row][col - 1])
-      }
-
-      // Check lower neighbor
-      if (row < rows - 1) {
-        checkMatchesWithoutVisualUpdate(tiles[row][col], tiles[row + 1][col])
-      }
-
-      // Check upper neighbor
-      if (row > 0) {
-        checkMatchesWithoutVisualUpdate(tiles[row][col], tiles[row - 1][col])
-      }
-    }
-  }
-
-  // After checking all possibilities, return whether moves are available
-  return movesAvailable
+function cloneTiles(tiles) {
+  return tiles.map(row =>
+    row.map(tile => ({
+      type: tile.getData('type'),
+      row: tile.getData('row'),
+      col: tile.getData('col'),
+      sprite: tile // Reference to the original Phaser sprite
+    }))
+  );
 }
 
-function getUniqueMatches(tiles) {
-  // const tiles = cloneDeep(tiles)
-  const rows = tiles.length
-  const cols = tiles[0].length
-  const matches = []
+function checkForPossibleMatches(_tiles) {
+  const tiles = cloneTiles(_tiles);
+  const rows = tiles.length;
+  const cols = tiles[0].length;
+  let movesAvailable = false;
 
-  // Function to find matches in a given direction
+  const tempSwapTiles = (tile1, tile2) => {
+    const row1 = tile1.row;
+    const col1 = tile1.col;
+    const row2 = tile2.row;
+    const col2 = tile2.col;
+
+    [tiles[row1][col1], tiles[row2][col2]] = [tiles[row2][col2], tiles[row1][col1]];
+
+    tiles[row1][col1].row = row1;
+    tiles[row1][col1].col = col1;
+    tiles[row2][col2].row = row2;
+    tiles[row2][col2].col = col2;
+  };
+
+  const revertTempChanges = (tile1, tile2) => {
+    tempSwapTiles(tile1, tile2);
+  };
+
+  const checkMatchesWithoutVisualUpdate = (tile1, tile2) => {
+    tempSwapTiles(tile1, tile2);
+    const matches = getUniqueMatches(tiles, false);
+    revertTempChanges(tile1, tile2);
+    if (matches.length > 0) {
+      movesAvailable = matches.map(match => match.sprite);
+    }
+  };
+
+  for (let row = 0; row < rows && !movesAvailable; row++) {
+    for (let col = 0; col < cols && !movesAvailable; col++) {
+      if (col < cols - 1 && !movesAvailable) {
+        checkMatchesWithoutVisualUpdate(tiles[row][col], tiles[row][col + 1]);
+      }
+      if (col > 0 && !movesAvailable) {
+        checkMatchesWithoutVisualUpdate(tiles[row][col], tiles[row][col - 1]);
+      }
+      if (row < rows - 1 && !movesAvailable) {
+        checkMatchesWithoutVisualUpdate(tiles[row][col], tiles[row + 1][col]);
+      }
+      if (row > 0 && !movesAvailable) {
+        checkMatchesWithoutVisualUpdate(tiles[row][col], tiles[row - 1][col]);
+      }
+    }
+  }
+  return movesAvailable;
+}
+
+function getUniqueMatches(tiles, isSprite = true) {
+  const rows = tiles.length;
+  const cols = tiles[0].length;
+  const matches = [];
+
+  const getTileType = (tile) => {
+    return isSprite ? tile.getData('type') : tile.type;
+  };
+
   const findMatchesInDirection = (startRow, startCol, rowIncrement, colIncrement) => {
-    const matchesFound = []
-    let currentRow = startRow
-    let currentCol = startCol
-    let matchLength = 1
+    const matchesFound = [];
+    let currentRow = startRow;
+    let currentCol = startCol;
+    let matchLength = 1;
 
     while (currentRow >= 0 && currentRow < rows && currentCol >= 0 && currentCol < cols) {
-      const currentTile = tiles[currentRow][currentCol]
-      const nextRow = currentRow + rowIncrement
-      const nextCol = currentCol + colIncrement
+      const currentTile = tiles[currentRow][currentCol];
+      const nextRow = currentRow + rowIncrement;
+      const nextCol = currentCol + colIncrement;
 
       if (
         nextRow < 0 ||
         nextRow >= rows ||
         nextCol < 0 ||
         nextCol >= cols ||
-        currentTile.getData('type') !== tiles[nextRow][nextCol].getData('type')
+        getTileType(currentTile) !== getTileType(tiles[nextRow][nextCol])
       ) {
         if (matchLength >= 3) {
           for (let i = 0; i < matchLength; i++) {
-            matchesFound.push(tiles[currentRow - i * rowIncrement][currentCol - i * colIncrement])
+            matchesFound.push(tiles[currentRow - i * rowIncrement][currentCol - i * colIncrement]);
           }
         }
-        matchLength = 1
+        matchLength = 1;
       } else {
-        matchLength++
+        matchLength++;
       }
 
-      currentRow = nextRow
-      currentCol = nextCol
+      currentRow = nextRow;
+      currentCol = nextCol;
     }
 
-    return matchesFound
-  }
+    return matchesFound;
+  };
 
-  // Check for horizontal and vertical matches
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      // Horizontal match check
       if (col < cols - 2) {
-        const horizontalMatches = findMatchesInDirection(row, col, 0, 1)
+        const horizontalMatches = findMatchesInDirection(row, col, 0, 1);
         if (horizontalMatches.length > 0) {
-          matches.push(...horizontalMatches)
+          matches.push(...horizontalMatches);
         }
       }
-
-      // Vertical match check
       if (row < rows - 2) {
-        const verticalMatches = findMatchesInDirection(row, col, 1, 0)
+        const verticalMatches = findMatchesInDirection(row, col, 1, 0);
         if (verticalMatches.length > 0) {
-          matches.push(...verticalMatches)
+          matches.push(...verticalMatches);
         }
       }
     }
   }
 
-  // Remove duplicate matches
-  const uniqueMatches = [...new Set(matches)]
+  return [...new Set(matches)];
+}
 
-  return uniqueMatches
+async function checkPossibleMoves(_tiles, signal) {
+  if (signal.aborted) return;
+
+  const hasMoves = checkForPossibleMatches(_tiles);
+
+  if (signal.aborted) return;
+  
+  return hasMoves;
 }
-// Export the function to be used in other files
+
+// Export the functions to be used in other files
 export default {
-  checkForAvailableMoves,
+  checkPossibleMoves,
   getUniqueMatches
-}
+};

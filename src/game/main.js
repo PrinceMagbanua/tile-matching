@@ -25,11 +25,12 @@ class MainScene extends Phaser.Scene {
   }
 
   create() {
+    this.abortController = new AbortController();
     this.preloadAnimations()
     const rows = 8
     const cols = 8
     const tileSize = 64
-    const numTypes = 6
+    const numTypes = 10
 
     this.isMatching = false
     this.tiles = []
@@ -211,6 +212,29 @@ class MainScene extends Phaser.Scene {
     })
   }
 
+
+  async startCheckForPossibleMatches(tiles) {
+    this.abortController.abort(); // Abort any ongoing check
+    this.abortController = new AbortController(); // Create a new controller
+
+    GameLogic.checkPossibleMoves(tiles, this.abortController.signal)
+      .then(movesAvailable => {
+        if (movesAvailable) {
+          console.log('Moves are available ', movesAvailable);
+        } else {
+          alert('No moves available');
+        }
+      })
+      .catch(error => {
+        if (error.name === 'AbortError') {
+          console.log('Check was aborted');
+        } else {
+          console.error('An error occurred:', error);
+        }
+      });
+  }
+
+
   async checkMatches(movedTile1, movedTile2) {
     this.isProcessing = true
     //CONTINUE CODING
@@ -218,18 +242,14 @@ class MainScene extends Phaser.Scene {
     if (uniqueMatches.length > 0) {
       await this.removeMatches(uniqueMatches)
     } else {
+
       if (movedTile2 && movedTile1) {
         // swapback
         this.swapTiles(movedTile2, movedTile1, true)
       }
 
-      // const movesAvailable = GameLogic.checkForAvailableMoves(this.tiles)
-      // if (!movesAvailable) {
-      //   console.log('no more moves!!')
-      //   alert('no more moves!!')
-      // } else {
-      //   console.log('continue gameplay!! moves found:', movesAvailable)
-      // }
+   
+      this.startCheckForPossibleMatches(this.tiles);
     }
   }
 
@@ -238,6 +258,8 @@ class MainScene extends Phaser.Scene {
     this.scoreText.setText('Score: ' + this.score)
 
     const popSounds = ['pop1', 'pop2', 'pop3', 'pop4'] // Array of pop sound keys
+    const randomPopSound = Phaser.Math.RND.pick(popSounds) // Random pop sound
+    this.sound.play(randomPopSound)
 
     // Promisify the destruction process
     const destroyTile = (tile, index) => {
@@ -245,15 +267,10 @@ class MainScene extends Phaser.Scene {
         const row = tile.getData('row')
         const col = tile.getData('col')
 
-        const randomPopSound = Phaser.Math.RND.pick(popSounds) // Random pop sound
 
         const delay = index * 40 // Delay between each sound (adjust as needed)
 
-        // Play pop sound with delay
-        this.time.delayedCall(delay, () => {
-          this.sound.play(randomPopSound)
-        })
-
+        
         // Trigger bubble pop animation
         const animSprite = this.add
           .sprite(tile.x + tile.width / 2, tile.y + tile.height / 2, 'pop-anim')
@@ -261,7 +278,6 @@ class MainScene extends Phaser.Scene {
         animSprite.play('bubblePop')
         animSprite.on('animationcomplete', () => {
           animSprite.destroy()
-          // Resolve the promise once animation is complete
         })
 
         this.gameContainer.add(animSprite)
@@ -286,7 +302,7 @@ class MainScene extends Phaser.Scene {
     const rows = this.tiles.length
     const cols = this.tiles[0].length
     const tileSize = 64
-    const numTypes = 6
+    const numTypes = 10
 
     let promises = [] // Array to store promises for each animation
 
@@ -333,6 +349,7 @@ class MainScene extends Phaser.Scene {
 
     // Wait for all promises to resolve before checking matches
     Promise.all(promises).then(() => {
+      
       this.checkMatches()
     })
 
