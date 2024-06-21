@@ -1,3 +1,4 @@
+import GameLogic from './gameLogic'
 class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene')
@@ -13,18 +14,18 @@ class MainScene extends Phaser.Scene {
     this.load.audio('pop3', 'assets/sfx/pop3.wav')
     this.load.audio('pop4', 'assets/sfx/pop4.wav')
   }
-  
-  preloadAnimations(){
+
+  preloadAnimations() {
     this.anims.create({
       key: 'bubblePop',
       frames: this.anims.generateFrameNumbers('pop-anim', { start: 0, end: 4 }), // 5 frames: 0 to 4
       frameRate: 30,
       repeat: 0
-    });
+    })
   }
 
   create() {
-    this.preloadAnimations();
+    this.preloadAnimations()
     const rows = 8
     const cols = 8
     const tileSize = 64
@@ -61,13 +62,13 @@ class MainScene extends Phaser.Scene {
     // Create the selected tile indicator, initially hidden
     this.selectedTileIndicator = this.add.image(0, 0, 'selectedTile').setOrigin(0).setVisible(false)
     this.gameContainer.add(this.selectedTileIndicator)
-    
+
     this.countdownAnimation(() => {
       this.checkMatches()
     })
 
     this.input.on('dragstart', (pointer, tile) => {
-      if(this.isProcessing) return;
+      if (this.isProcessing) return
       tile.startX = tile.x // Store initial position
       tile.startY = tile.y // Store initial position
       this.selectedTileIndicator.setPosition(tile.x, tile.y).setVisible(true)
@@ -142,7 +143,6 @@ class MainScene extends Phaser.Scene {
   }
 
   selectTile(tile) {
-
     if (this.selectedTile) {
       if (this.selectedTile === tile) {
         this.selectedTile = null // Deselect the tile if the same tile is clicked again
@@ -212,133 +212,83 @@ class MainScene extends Phaser.Scene {
   }
 
   async checkMatches(movedTile1, movedTile2) {
-    this.isProcessing = true;
-    const rows = this.tiles.length
-    const cols = this.tiles[0].length
-    const matches = []
-
-    // Function to find matches in a given direction
-    const findMatchesInDirection = (startRow, startCol, rowIncrement, colIncrement) => {
-      const matchesFound = []
-      let currentRow = startRow
-      let currentCol = startCol
-      let matchLength = 1
-
-      while (currentRow >= 0 && currentRow < rows && currentCol >= 0 && currentCol < cols) {
-        const currentTile = this.tiles[currentRow][currentCol]
-        const nextRow = currentRow + rowIncrement
-        const nextCol = currentCol + colIncrement
-
-        if (
-          nextRow < 0 ||
-          nextRow >= rows ||
-          nextCol < 0 ||
-          nextCol >= cols ||
-          currentTile.getData('type') !== this.tiles[nextRow][nextCol].getData('type')
-        ) {
-          if (matchLength >= 3) {
-            for (let i = 0; i < matchLength; i++) {
-              matchesFound.push(
-                this.tiles[currentRow - i * rowIncrement][currentCol - i * colIncrement]
-              )
-            }
-          }
-          matchLength = 1
-        } else {
-          matchLength++
-        }
-
-        currentRow = nextRow
-        currentCol = nextCol
-      }
-
-      return matchesFound
-    }
-
-    // Check for horizontal and vertical matches
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        // Horizontal match check
-        if (col < cols - 2) {
-          const horizontalMatches = findMatchesInDirection(row, col, 0, 1)
-          if (horizontalMatches.length > 0) {
-            matches.push(...horizontalMatches)
-          }
-        }
-
-        // Vertical match check
-        if (row < rows - 2) {
-          const verticalMatches = findMatchesInDirection(row, col, 1, 0)
-          if (verticalMatches.length > 0) {
-            matches.push(...verticalMatches)
-          }
-        }
-      }
-    }
-
-    // Remove duplicate matches
-    const uniqueMatches = [...new Set(matches)]
-
+    this.isProcessing = true
+    //CONTINUE CODING
+    const uniqueMatches = GameLogic.getUniqueMatches(this.tiles)
     if (uniqueMatches.length > 0) {
       await this.removeMatches(uniqueMatches)
     } else {
-      if (movedTile2 && movedTile1) { // swapback
+      if (movedTile2 && movedTile1) {
+        // swapback
         this.swapTiles(movedTile2, movedTile1, true)
       }
+
+      // const movesAvailable = GameLogic.checkForAvailableMoves(this.tiles)
+      // if (!movesAvailable) {
+      //   console.log('no more moves!!')
+      //   alert('no more moves!!')
+      // } else {
+      //   console.log('continue gameplay!! moves found:', movesAvailable)
+      // }
     }
   }
 
   async removeMatches(matches) {
     this.score += matches.length
     this.scoreText.setText('Score: ' + this.score)
-    var self = this;
-    // Array of pop sound keys
-    const popSounds = ['pop1', 'pop2', 'pop3', 'pop4'] // Add more sound keys as needed
-    const destroyMatches = (tile, index) => {
-      const row = tile.getData('row')
-      const col = tile.getData('col')
 
-      // Choose a random pop sound from the array
-      const randomPopSound = Phaser.Math.RND.pick(popSounds)
+    const popSounds = ['pop1', 'pop2', 'pop3', 'pop4'] // Array of pop sound keys
 
-      // Calculate delay based on index (adjust the delay value as needed)
-      const delay = index * 40 // 300ms delay between each sound (adjust as desired)
+    // Promisify the destruction process
+    const destroyTile = (tile, index) => {
+      return new Promise((resolve) => {
+        const row = tile.getData('row')
+        const col = tile.getData('col')
 
-      // Play the chosen pop sound with delay
-      this.time.delayedCall(delay, () => {
-        this.sound.play(randomPopSound)
-      })
+        const randomPopSound = Phaser.Math.RND.pick(popSounds) // Random pop sound
 
-      // Trigger the bubble pop animation independently
-      const animSprite = this.add
-        .sprite(tile.x + tile.width / 2, tile.y + tile.height / 2, 'pop-anim')
-        .setScale(1)
-      animSprite.play('bubblePop')
-      animSprite.on('animationcomplete', () => {
-        animSprite.destroy()
-      })
+        const delay = index * 40 // Delay between each sound (adjust as needed)
 
-      this.gameContainer.add(animSprite);
+        // Play pop sound with delay
+        this.time.delayedCall(delay, () => {
+          this.sound.play(randomPopSound)
+        })
 
-      // Remove tile from the array and destroy the sprite after the delay
-      this.time.delayedCall(delay, () => {
-        this.tiles[row][col] = null
-        tile.destroy()
+        // Trigger bubble pop animation
+        const animSprite = this.add
+          .sprite(tile.x + tile.width / 2, tile.y + tile.height / 2, 'pop-anim')
+          .setScale(1)
+        animSprite.play('bubblePop')
+        animSprite.on('animationcomplete', () => {
+          animSprite.destroy()
+          // Resolve the promise once animation is complete
+        })
+
+        this.gameContainer.add(animSprite)
+
+        // Destroy tile after delay
+        this.time.delayedCall(delay, () => {
+          this.tiles[row][col] = null
+          tile.destroy()
+          resolve()
+        })
       })
     }
-    matches.forEach(destroyMatches);
 
-    // Fill empty spaces after all matches are processed
-    this.time.delayedCall(matches.length * 50, () => {
-      this.fillEmptySpaces()
-    })
+    // Map destroyTile to each match and wait for all promises to resolve
+    await Promise.all(matches.map((match, index) => destroyTile(match, index)))
+
+    // After all animations and destructions are complete, fill empty spaces
+    this.fillEmptySpaces()
   }
-  
+
   fillEmptySpaces() {
     const rows = this.tiles.length
     const cols = this.tiles[0].length
     const tileSize = 64
     const numTypes = 6
+
+    let promises = [] // Array to store promises for each animation
 
     for (let col = 0; col < cols; col++) {
       let emptyRow = rows - 1
@@ -347,12 +297,17 @@ class MainScene extends Phaser.Scene {
           if (emptyRow !== row) {
             this.tiles[emptyRow][col] = this.tiles[row][col]
             this.tiles[emptyRow][col].setData('row', emptyRow)
-            this.animateTileFall(this.tiles[emptyRow][col], emptyRow * tileSize)
+            promises.push(
+              new Promise((resolve) => {
+                this.animateTileFall(this.tiles[emptyRow][col], emptyRow * tileSize, resolve)
+              })
+            )
             this.tiles[row][col] = null
           }
           emptyRow--
         }
       }
+
       for (let newRow = emptyRow; newRow >= 0; newRow--) {
         const type = Phaser.Math.Between(0, numTypes - 1)
         const tile = this.add
@@ -368,15 +323,31 @@ class MainScene extends Phaser.Scene {
         this.input.setDraggable(tile)
         this.tiles[newRow][col] = tile
         this.gameContainer.add(tile)
-        this.animateTileFall(tile, newRow * tileSize)
+        promises.push(
+          new Promise((resolve) => {
+            this.animateTileFall(tile, newRow * tileSize, resolve)
+          })
+        )
       }
     }
-    this.isProcessing = false;
-    this.time.delayedCall(1000, () => {
+
+    // Wait for all promises to resolve before checking matches
+    Promise.all(promises).then(() => {
       this.checkMatches()
     })
+
+    this.isProcessing = false
   }
 
+  animateTileFall(tile, targetY, onComplete) {
+    return this.tweens.add({
+      targets: tile,
+      y: targetY,
+      duration: 100,
+      ease: 'Bounce',
+      onComplete: onComplete // Call onComplete when animation is complete
+    })
+  }
   handleSwipe(tile, direction) {
     const row = tile.getData('row')
     const col = tile.getData('col')
@@ -410,18 +381,6 @@ class MainScene extends Phaser.Scene {
       }
     })
   }
-  animateTileFall(tile, targetY) {
-    this.tweens.add({
-      targets: tile,
-      y: targetY,
-      duration: 300,
-      ease: 'Bounce',
-      onComplete: () => {
-       
-      }
-    });
-  }
-  
 }
 
 export default function StartGame(containerId) {
