@@ -5,7 +5,10 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.spritesheet('tiles', 'assets/spritesheet-1.png', { frameWidth: 64, frameHeight: 64 })
+    this.load.spritesheet('tiles', 'assets/spritesheet-gems.png', {
+      frameWidth: 64,
+      frameHeight: 64
+    })
     this.load.spritesheet('pop-anim', 'assets/pop-anim.png', { frameWidth: 64, frameHeight: 64 })
     this.load.image('selectedTile', 'assets/selectedTileFrame.png')
 
@@ -25,7 +28,7 @@ class MainScene extends Phaser.Scene {
   }
 
   create() {
-    this.abortController = new AbortController();
+    this.abortController = new AbortController()
     this.preloadAnimations()
     const rows = 8
     const cols = 8
@@ -212,28 +215,58 @@ class MainScene extends Phaser.Scene {
     })
   }
 
-
-  async startCheckForPossibleMatches(tiles) {
-    this.abortController.abort(); // Abort any ongoing check
-    this.abortController = new AbortController(); // Create a new controller
-
-    GameLogic.checkPossibleMoves(tiles, this.abortController.signal)
-      .then(movesAvailable => {
-        if (movesAvailable) {
-          console.log('Moves are available ', movesAvailable);
-        } else {
-          alert('No moves available');
-        }
-      })
-      .catch(error => {
-        if (error.name === 'AbortError') {
-          console.log('Check was aborted');
-        } else {
-          console.error('An error occurred:', error);
-        }
-      });
+  indicateTileAnim(tile, onComplete){
+    const originalY = tile.y;
+    this.tweens.add({
+      targets: tile,
+      y: tile.y - 5, // Float up by 10 pixels
+      ease: 'Linear',
+      duration: 300, // Animation duration (milliseconds)
+      yoyo: true,
+      delay: 1000,
+      repeat: 3, // Repeat once
+      onComplete: () => {
+        tile.y = originalY; // Restore original Y position
+      }
+    });
   }
 
+  async startCheckForPossibleMatches(tiles) {
+    this.abortController.abort() // Abort any ongoing check
+    clearTimeout(this.animationTimer); // reset timer
+    this.abortController = new AbortController() // Create a new controller
+
+    this.animationTimer = null
+    const timerDuration = 5000 // Example: 5 seconds for animation
+
+    // Function to animate or highlight matched tiles
+    const animateMatchingTiles = (matchingTiles) => {
+      matchingTiles.forEach((tile) => {
+        this.indicateTileAnim(tile);
+      })
+    }
+
+    GameLogic.checkPossibleMoves(tiles, this.abortController.signal)
+      .then((movesAvailable) => {
+        if (movesAvailable) {
+          console.log('Moves are available ', movesAvailable)
+
+          // Start animation timer
+          this.animationTimer = setTimeout(() => {
+            animateMatchingTiles(movesAvailable)
+          }, timerDuration)
+        } else {
+          alert('No moves available')
+        }
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError') {
+          console.log('Check was aborted')
+        } else {
+          console.error('An error occurred:', error)
+        }
+      })
+  }
 
   async checkMatches(movedTile1, movedTile2) {
     this.isProcessing = true
@@ -242,14 +275,12 @@ class MainScene extends Phaser.Scene {
     if (uniqueMatches.length > 0) {
       await this.removeMatches(uniqueMatches)
     } else {
-
       if (movedTile2 && movedTile1) {
         // swapback
         this.swapTiles(movedTile2, movedTile1, true)
       }
 
-   
-      this.startCheckForPossibleMatches(this.tiles);
+      this.startCheckForPossibleMatches(this.tiles)
     }
   }
 
@@ -267,10 +298,8 @@ class MainScene extends Phaser.Scene {
         const row = tile.getData('row')
         const col = tile.getData('col')
 
-
         const delay = index * 40 // Delay between each sound (adjust as needed)
 
-        
         // Trigger bubble pop animation
         const animSprite = this.add
           .sprite(tile.x + tile.width / 2, tile.y + tile.height / 2, 'pop-anim')
@@ -349,7 +378,6 @@ class MainScene extends Phaser.Scene {
 
     // Wait for all promises to resolve before checking matches
     Promise.all(promises).then(() => {
-      
       this.checkMatches()
     })
 
