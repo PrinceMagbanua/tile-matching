@@ -1,10 +1,20 @@
 import GameLogic from './gameLogic'
+import Combinations from './combinations'
+
+const gameSettings = {
+  numOfTypes: 4
+}
+
 class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene')
   }
 
   preload() {
+    this.load.spritesheet('combo-tiles', 'assets/special-gems/combination-gems.png', {
+      frameWidth: 64,
+      frameHeight: 64
+    })
     this.load.spritesheet('tiles', 'assets/spritesheet-gems.png', {
       frameWidth: 64,
       frameHeight: 64
@@ -33,9 +43,8 @@ class MainScene extends Phaser.Scene {
     const rows = 8
     const cols = 8
     const tileSize = 64
-    const numTypes = 6
+    const numTypes = gameSettings.numOfTypes
 
-    this.isMatching = false
     this.tiles = []
     this.selectedTile = null
     this.score = 0
@@ -72,6 +81,8 @@ class MainScene extends Phaser.Scene {
     })
 
     this.input.on('dragstart', (pointer, tile) => {
+      clearTimeout(this.animationTimer) // Clear animation timer if set
+      this.interruptAnimation(this.tilesToAnimateHint) // Interrupt animation for matching tiles
       if (this.isProcessing) return
       tile.startX = tile.x // Store initial position
       tile.startY = tile.y // Store initial position
@@ -79,6 +90,7 @@ class MainScene extends Phaser.Scene {
     })
 
     this.input.on('dragend', (pointer, tile) => {
+      if (this.isProcessing) return
       this.selectedTileIndicator.setVisible(false)
       const dragThreshold = 32
       const deltaX = pointer.upX - pointer.downX
@@ -147,6 +159,7 @@ class MainScene extends Phaser.Scene {
   }
 
   selectTile(tile) {
+    if (this.isProcessing) return
     if (this.selectedTile) {
       if (this.selectedTile === tile) {
         this.selectedTile = null // Deselect the tile if the same tile is clicked again
@@ -215,71 +228,85 @@ class MainScene extends Phaser.Scene {
     })
   }
 
-  indicateTileAnim(tile, onComplete){
-    const originalY = tile.y;
-    this.tweens.add({
+  // Refactored indicateTileAnim function
+  indicateTileAnim(tile) {
+    const originalY = tile.y
+    tile.tween = this.tweens.add({
       targets: tile,
-      y: tile.y - 5, // Float up by 10 pixels
+      y: tile.y - 5, // Float up by 5 pixels
       ease: 'Linear',
       duration: 300, // Animation duration (milliseconds)
       yoyo: true,
-      delay: 1000,
-      repeat: 3, // Repeat once
-      onComplete: () => {
-        tile.y = originalY; // Restore original Y position
+      repeat: 3, // Repeat twice (original once, yoyo once)
+      onStop: () => {
+        tile.y = originalY
       }
-    });
+    })
+    this.tilesToAnimateHint.push(tile)
   }
 
   async startCheckForPossibleMatches(tiles) {
     this.abortController.abort() // Abort any ongoing check
-    clearTimeout(this.animationTimer); // reset timer
+    clearTimeout(this.animationTimer) // Reset timer
     this.abortController = new AbortController() // Create a new controller
 
     this.animationTimer = null
     const timerDuration = 5000 // Example: 5 seconds for animation
 
     // Function to animate or highlight matched tiles
-    const animateMatchingTiles = (matchingTiles) => {
-      matchingTiles.forEach((tile) => {
-        this.indicateTileAnim(tile);
-      })
+    const animateMatchingTiles = async (matchingTiles) => {
+      this.tilesToAnimateHint = []
+      for (let tile of matchingTiles) {
+        this.indicateTileAnim.call(this, tile)
+      }
     }
 
-    GameLogic.checkPossibleMoves(tiles, this.abortController.signal)
-      .then((movesAvailable) => {
-        if (movesAvailable) {
-          console.log('Moves are available ', movesAvailable)
+    try {
+      const movesAvailable = await GameLogic.checkPossibleMoves(tiles, this.abortController.signal)
 
-          // Start animation timer
-          this.animationTimer = setTimeout(() => {
-            animateMatchingTiles(movesAvailable)
-          }, timerDuration)
-        } else {
-          alert('No moves available')
-        }
-      })
-      .catch((error) => {
-        if (error.name === 'AbortError') {
-          console.log('Check was aborted')
-        } else {
-          console.error('An error occurred:', error)
-        }
-      })
+      if (movesAvailable) {
+        console.log('Moves are available ', movesAvailable)
+        // Start animation timer
+        this.animationTimer = setTimeout(async () => {
+          await animateMatchingTiles.call(this, movesAvailable)
+        }, timerDuration)
+      } else {
+        alert('No moves available')
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Check was aborted')
+      } else {
+        console.error('An error occurred:', error)
+      }
+    }
+  }
+
+  // Function to interrupt animation immediately
+  interruptAnimation(matchingTiles) {
+    ;(matchingTiles || []).forEach((tile) => {
+      if (tile.tween) {
+        tile.tween.stop() // Stop the tween if it's currently playing
+        // tile.y = tile.originalY
+      }
+    })
   }
 
   async checkMatches(movedTile1, movedTile2) {
     this.isProcessing = true
     //CONTINUE CODING
-    const uniqueMatches = GameLogic.getUniqueMatches(this.tiles)
-    if (uniqueMatches.length > 0) {
-      await this.removeMatches(uniqueMatches)
+    const matches = Combinations.checkCombinations(this.tiles);
+    console.log('matchedTiles: ',matches);
+    if (matches.length > 0) {
+
+      await this.removeMatches(matches)
     } else {
       if (movedTile2 && movedTile1) {
         // swapback
         this.swapTiles(movedTile2, movedTile1, true)
       }
 
+      this.isProcessing = false
       this.startCheckForPossibleMatches(this.tiles)
     }
   }
@@ -331,7 +358,7 @@ class MainScene extends Phaser.Scene {
     const rows = this.tiles.length
     const cols = this.tiles[0].length
     const tileSize = 64
-    const numTypes = 6
+    const numTypes = gameSettings.numOfTypes
 
     let promises = [] // Array to store promises for each animation
 
@@ -380,8 +407,6 @@ class MainScene extends Phaser.Scene {
     Promise.all(promises).then(() => {
       this.checkMatches()
     })
-
-    this.isProcessing = false
   }
 
   animateTileFall(tile, targetY, onComplete) {

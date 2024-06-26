@@ -9,7 +9,6 @@ function cloneTiles(tiles) {
     }))
   );
 }
-
 function checkForPossibleMatches(_tiles) {
   const tiles = cloneTiles(_tiles);
   const rows = tiles.length;
@@ -36,7 +35,7 @@ function checkForPossibleMatches(_tiles) {
 
   const checkMatchesWithoutVisualUpdate = (tile1, tile2) => {
     tempSwapTiles(tile1, tile2);
-    const matches = getUniqueMatches(tiles, false);
+    const { ungrouped: matches } = getUniqueMatches(tiles, false);
     revertTempChanges(tile1, tile2);
     if (matches.length > 0) {
       movesAvailable = matches.map(match => match.sprite);
@@ -66,6 +65,7 @@ function getUniqueMatches(tiles, isSprite = true) {
   const rows = tiles.length;
   const cols = tiles[0].length;
   const matches = [];
+  const matchedTiles = new Set();
 
   const getTileType = (tile) => {
     return isSprite ? tile.getData('type') : tile.type;
@@ -91,7 +91,9 @@ function getUniqueMatches(tiles, isSprite = true) {
       ) {
         if (matchLength >= 3) {
           for (let i = 0; i < matchLength; i++) {
-            matchesFound.push(tiles[currentRow - i * rowIncrement][currentCol - i * colIncrement]);
+            const matchedTile = tiles[currentRow - i * rowIncrement][currentCol - i * colIncrement];
+            matchesFound.push(matchedTile);
+            matchedTiles.add(matchedTile);
           }
         }
         matchLength = 1;
@@ -111,20 +113,24 @@ function getUniqueMatches(tiles, isSprite = true) {
       if (col < cols - 2) {
         const horizontalMatches = findMatchesInDirection(row, col, 0, 1);
         if (horizontalMatches.length > 0) {
-          matches.push(...horizontalMatches);
+          matches.push(horizontalMatches);
         }
       }
       if (row < rows - 2) {
         const verticalMatches = findMatchesInDirection(row, col, 1, 0);
         if (verticalMatches.length > 0) {
-          matches.push(...verticalMatches);
+          matches.push(verticalMatches);
         }
       }
     }
   }
 
-  return [...new Set(matches)];
+  return {
+    grouped: matches,
+    ungrouped: Array.from(matchedTiles)
+  };
 }
+
 
 async function checkPossibleMoves(_tiles, signal) {
   if (signal.aborted) return;
