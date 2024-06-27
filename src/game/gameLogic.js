@@ -60,12 +60,14 @@ function checkForPossibleMatches(_tiles) {
   }
   return movesAvailable;
 }
+// gameLogic.js
 
 function getUniqueMatches(tiles, isSprite = true) {
   const rows = tiles.length;
   const cols = tiles[0].length;
-  const matches = [];
-  const matchedTiles = new Set();
+  const matchedTiles = new Set(); // Track unique tiles
+  let longestMatch = []; // Track the longest match found
+  const matches = []; // Track unique match groups
 
   const getTileType = (tile) => {
     return isSprite ? tile.getData('type') : tile.type;
@@ -90,15 +92,25 @@ function getUniqueMatches(tiles, isSprite = true) {
         getTileType(currentTile) !== getTileType(tiles[nextRow][nextCol])
       ) {
         if (matchLength >= 3) {
+          const matchGroup = [];
           for (let i = 0; i < matchLength; i++) {
             const matchedTile = tiles[currentRow - i * rowIncrement][currentCol - i * colIncrement];
-            matchesFound.push(matchedTile);
-            matchedTiles.add(matchedTile);
+            matchGroup.push(matchedTile);
+            matchedTiles.add(matchedTile); // Add each tile to the Set
+          }
+
+          // Check if this match group is longer than the current longest match
+          if (matchGroup.length > longestMatch.length) {
+            longestMatch = matchGroup; // Update the longest match found
           }
         }
         matchLength = 1;
       } else {
         matchLength++;
+        const matchedTile = tiles[currentRow][currentCol];
+        if (matchLength === 3) {
+          matchedTiles.add(matchedTile); // Add the first tile of the match to the Set
+        }
       }
 
       currentRow = nextRow;
@@ -108,28 +120,33 @@ function getUniqueMatches(tiles, isSprite = true) {
     return matchesFound;
   };
 
+  // Iterate over each tile to find matches in both horizontal and vertical directions
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       if (col < cols - 2) {
         const horizontalMatches = findMatchesInDirection(row, col, 0, 1);
         if (horizontalMatches.length > 0) {
-          matches.push(horizontalMatches);
+          matches.push(...horizontalMatches); // Spread the matches into the main matches array
         }
       }
       if (row < rows - 2) {
         const verticalMatches = findMatchesInDirection(row, col, 1, 0);
         if (verticalMatches.length > 0) {
-          matches.push(verticalMatches);
+          matches.push(...verticalMatches); // Spread the matches into the main matches array
         }
       }
     }
   }
 
-  return {
-    grouped: matches,
-    ungrouped: Array.from(matchedTiles)
-  };
+  // Check if there is a longest match found and replace matches with only the longest one
+  if (longestMatch.length > 0) {
+    return { grouped: [longestMatch], ungrouped: [...matchedTiles] };
+  } else {
+    return { grouped: [], ungrouped: [...matchedTiles] };
+  }
 }
+
+
 
 
 async function checkPossibleMoves(_tiles, signal) {

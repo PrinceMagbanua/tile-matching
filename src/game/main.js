@@ -295,10 +295,9 @@ class MainScene extends Phaser.Scene {
   async checkMatches(movedTile1, movedTile2) {
     this.isProcessing = true
     //CONTINUE CODING
-    const matches = Combinations.checkCombinations(this.tiles);
-    console.log('matchedTiles: ',matches);
+    const matches = Combinations.checkCombinations(this.tiles)
+    console.log('matchedTiles: ', matches)
     if (matches.length > 0) {
-
       await this.removeMatches(matches)
     } else {
       if (movedTile2 && movedTile1) {
@@ -369,6 +368,7 @@ class MainScene extends Phaser.Scene {
           if (emptyRow !== row) {
             this.tiles[emptyRow][col] = this.tiles[row][col]
             this.tiles[emptyRow][col].setData('row', emptyRow)
+
             promises.push(
               new Promise((resolve) => {
                 this.animateTileFall(this.tiles[emptyRow][col], emptyRow * tileSize, resolve)
@@ -395,8 +395,10 @@ class MainScene extends Phaser.Scene {
         this.input.setDraggable(tile)
         this.tiles[newRow][col] = tile
         this.gameContainer.add(tile)
+
         promises.push(
           new Promise((resolve) => {
+            
             this.animateTileFall(tile, newRow * tileSize, resolve)
           })
         )
